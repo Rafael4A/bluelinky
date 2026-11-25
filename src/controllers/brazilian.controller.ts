@@ -18,6 +18,7 @@ interface BrazilianVehicleDescription {
   vehicleName: string;
   regDate: string;
   vehicleId: string;
+  ccuCCS2ProtocolSupport?: number | boolean;
 }
 
 export class BrazilianController extends SessionController<BrazilianBlueLinkyConfig> {

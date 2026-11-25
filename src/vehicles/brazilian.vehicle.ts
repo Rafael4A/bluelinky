@@ -22,6 +22,7 @@ import {
   VehicleTargetSOC,
   VehicleWindowsOptions,
 } from '../interfaces/common.interfaces';
+import { Ccs2VehicleState } from '../interfaces/ccs2.interfaces';
 
 import got, { GotInstance, GotJSONFn } from 'got';
 import { BrazilianController } from '../controllers/brazilian.controller';
@@ -185,10 +186,11 @@ export default class BrazilianVehicle extends Vehicle {
         return null;
       }
 
+      const location = vehicleStatus?.Location ?? vehicleStatus?.Green?.Location;
       this._fullStatus = {
-        vehicleLocation: vehicleStatus?.Location ?? vehicleStatus?.Green?.Location,
+        vehicleLocation: location as FullVehicleStatus['vehicleLocation'],
         odometer,
-        vehicleStatus,
+        vehicleStatus: vehicleStatus as unknown as FullVehicleStatus['vehicleStatus'],
       };
       return this._fullStatus;
     } catch (err) {
@@ -210,7 +212,9 @@ export default class BrazilianVehicle extends Vehicle {
       const vehicleStatus = await this.fetchCcs2VehicleState(http, statusConfig.refresh);
       const parsedStatus = this.parseCcs2VehicleStatus(vehicleStatus);
 
-      this._status = statusConfig.parsed ? parsedStatus : vehicleStatus;
+      this._status = statusConfig.parsed
+        ? parsedStatus
+        : (vehicleStatus as unknown as RawVehicleStatus);
 
       return this._status;
     } catch (err) {
@@ -567,7 +571,7 @@ export default class BrazilianVehicle extends Vehicle {
   private async fetchCcs2VehicleState(
     http: GotInstance<GotJSONFn>,
     refresh: boolean
-  ): Promise<RawVehicleStatus> {
+  ): Promise<Ccs2VehicleState> {
     if (refresh) {
       this.updateRates(await http.get(this.ccs2StatusPath('')));
       await new Promise(resolve => setTimeout(resolve, 15000));
@@ -577,7 +581,7 @@ export default class BrazilianVehicle extends Vehicle {
     return response.body.resMsg.state.Vehicle;
   }
 
-  private parseCcs2VehicleStatus(vehicleStatus: RawVehicleStatus): VehicleStatus {
+  private parseCcs2VehicleStatus(vehicleStatus: Ccs2VehicleState): VehicleStatus {
     const locks = [
       !!vehicleStatus?.Cabin?.Door?.Row1?.Passenger?.Lock,
       !!vehicleStatus?.Cabin?.Door?.Row1?.Driver?.Lock,
@@ -626,7 +630,7 @@ export default class BrazilianVehicle extends Vehicle {
           !!vehicleStatus?.Electronics?.PowerSupply?.Ignition3,
         accessory: !!vehicleStatus?.Electronics?.PowerSupply?.Accessory,
         rangeGas: vehicleStatus?.Drivetrain?.FuelSystem?.DTE?.Gas,
-        range: vehicleStatus?.Drivetrain?.FuelSystem?.DTE?.Total,
+        range: vehicleStatus?.Drivetrain?.FuelSystem?.DTE?.Total ?? 0,
         rangeEV: vehicleStatus?.Drivetrain?.FuelSystem?.DTE?.EV,
         plugedTo: plugedTo,
         charging: undefined,
